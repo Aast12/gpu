@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#define DataType float
+#define DataType double
 
 // Compute C = A * B
-__global__ void gemm(DataType *A, DataType *B, DataType *C, int numARows,
-                      int numAColumns, int numBRows, int numBColumns) {
+__global__ void gemm(DataType* A, DataType* B, DataType* C, int numARows,
+                     int numAColumns, int numBRows, int numBColumns) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -25,11 +25,20 @@ double getTime() {
     return time.tv_sec * 1.0e6 + time.tv_usec;
 }
 
-int main(int argc, char **argv) {
+#define CHECK_CUDA_ERROR(call) { \
+    cudaError_t err = call; \
+    if (err != cudaSuccess) { \
+        fprintf(stderr, "CUDA Error - %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+        exit(1); \
+    } \
+}
+
+
+int main(int argc, char** argv) {
     // Reading matrix dimensions from command line arguments
     int numARows = atoi(argv[1]);
     int numAColumns = atoi(argv[2]);
-    int numBRows = numAColumns;  // numBRows = numAColumns for valid matrix multiplication
+    int numBRows = numAColumns; // numBRows = numAColumns for valid matrix multiplication
     int numBColumns = atoi(argv[3]);
     int numCRows = numARows;
     int numCColumns = numBColumns;
@@ -41,10 +50,10 @@ int main(int argc, char **argv) {
            numARows, numAColumns, numBRows, numBColumns, numCRows, numCColumns);
 
     // Allocate Host memory for input and output
-    hostA = (DataType *)malloc(numARows * numAColumns * sizeof(DataType));
-    hostB = (DataType *)malloc(numBRows * numBColumns * sizeof(DataType));
-    hostC = (DataType *)malloc(numCRows * numCColumns * sizeof(DataType));
-    resultRef = (DataType *)malloc(numCRows * numCColumns * sizeof(DataType));
+    hostA = (DataType*)malloc(numARows * numAColumns * sizeof(DataType));
+    hostB = (DataType*)malloc(numBRows * numBColumns * sizeof(DataType));
+    hostC = (DataType*)malloc(numCRows * numCColumns * sizeof(DataType));
+    resultRef = (DataType*)malloc(numCRows * numCColumns * sizeof(DataType));
 
     // Initialize hostA and hostB with random numbers, and compute reference result on CPU
     for (int i = 0; i < numARows; i++) {
@@ -68,14 +77,14 @@ int main(int argc, char **argv) {
     }
 
     // Allocate GPU memory
-    cudaMalloc((void **)&deviceA, numARows * numAColumns * sizeof(DataType));
-    cudaMalloc((void **)&deviceB, numBRows * numBColumns * sizeof(DataType));
-    cudaMalloc((void **)&deviceC, numCRows * numCColumns * sizeof(DataType));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&deviceA, numARows * numAColumns * sizeof(DataType)));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&deviceB, numBRows * numBColumns * sizeof(DataType)));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&deviceC, numCRows * numCColumns * sizeof(DataType)));
 
     // Copy data from Host to Device
     double startHostToDevice = getTime();
-    cudaMemcpy(deviceA, hostA, numARows * numAColumns * sizeof(DataType), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceB, hostB, numBRows * numBColumns * sizeof(DataType), cudaMemcpyHostToDevice);
+    CHECK_CUDA_ERROR(cudaMemcpy(deviceA, hostA, numARows * numAColumns * sizeof(DataType), cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(deviceB, hostB, numBRows * numBColumns * sizeof(DataType), cudaMemcpyHostToDevice));
     double hostToDeviceTime = getTime() - startHostToDevice;
     printf("Data Copy Host to Device Time: %.6f seconds\n", hostToDeviceTime / 1.0e6);
 
@@ -89,9 +98,10 @@ int main(int argc, char **argv) {
 
     // Launch the GPU Kernel
     gemm<<<grid, block>>>(deviceA, deviceB, deviceC, numARows, numAColumns, numBRows, numBColumns);
+    CHECK_CUDA_ERROR(cudaGetLastError());
 
     // Wait for GPU to finish
-    cudaDeviceSynchronize();
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
     // Stop GPU kernel timer
     double endKernelTime = getTime();
@@ -99,15 +109,15 @@ int main(int argc, char **argv) {
 
     // Copy the result from Device to Host
     double startDeviceToHost = getTime();
-    cudaMemcpy(hostC, deviceC, numCRows * numCColumns * sizeof(DataType), cudaMemcpyDeviceToHost);
+    CHECK_CUDA_ERROR(cudaMemcpy(hostC, deviceC, numCRows * numCColumns * sizeof(DataType), cudaMemcpyDeviceToHost));
     double deviceToHostTime = getTime() - startDeviceToHost;
     printf("Data Copy Device to Host Time: %.6f seconds\n", deviceToHostTime / 1.0e6);
 
     // Compare the result with the reference
     bool success = true;
-    for (int i = 0; i < numCRows; i++) {
+    for (int i = 0; i < numCRows && success; i++) {
         for (int j = 0; j < numCColumns; j++) {
-            if (abs(hostC[i * numCColumns + j] - resultRef[i * numCColumns + j]) > 1e-5) {
+            if (fabs(hostC[i * numCColumns + j] - resultRef[i * numCColumns + j]) > 1e-5) {
                 success = false;
                 break;
             }
@@ -116,7 +126,8 @@ int main(int argc, char **argv) {
 
     if (success) {
         printf("Results are correct!\n");
-    } else {
+    }
+    else {
         printf("Results are incorrect!\n");
     }
 

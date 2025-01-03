@@ -1,17 +1,28 @@
-cmake_minimum_required(VERSION 3.18)  # Better to use newer CMake for modern CUDA
-project(assignments CUDA C)
+cmake_minimum_required(VERSION 3.14)
+enable_language(CUDA)
+set(CMAKE_CUDA_ARCHITECTURES 75)  # Adjust for your GPU
+project(assignments CUDA CXX)
+
+find_package(CUDA REQUIRED)
 
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-find_package(CUDAToolkit REQUIRED)
+file(GLOB_RECURSE SOURCES
+        "*/src/*.cu"
+        "*/src/*.cpp"
+)
+# Tell CMake to treat all source files as CUDA sources
+set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE CUDA)
 
 add_executable(hw2_ex1
-        src/hw2_ex1.cu
+        assignment2/src/hw2_ex1.cu
 )
 add_executable(hw2_ex2
-        src/hw2_ex2.cu
+        assignment2/src/hw2_ex2.cu
 )
+
 set_target_properties(hw2_ex1 hw2_ex2 PROPERTIES
-        CUDA_ARCHITECTURES "86"
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "75"
 )

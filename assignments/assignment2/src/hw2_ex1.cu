@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/time.h>
+#include <iostream>
 
 #define DataType double
 
@@ -90,8 +91,10 @@ int main(int argc, char **argv) {
 
     bool success = true;
     for (int i = 0; i < inputLength; i++) {
-        if (abs(hostOutput[i] - resultRef[i]) > 1e-5) {
+        auto delta = abs(hostOutput[i] - resultRef[i]);
+        if (delta > 1e-5) {
             success = false;
+            std::cout << "Failed delta: " << delta << std::endl;
             break;
         }
     }

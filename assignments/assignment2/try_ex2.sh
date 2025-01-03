@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the executable and arguments
-EXECUTABLE="./hw2_ex2"
+EXECUTABLE="./build-release/hw2_ex2"
 MATRIX_DIMS=(
     "64 128 64"
     "1024 1023 8193"

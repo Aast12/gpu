@@ -49,6 +49,12 @@ void cputimer_stop(const char* info) {
     printf("Timing - %s. \t\tElasped %.0f microseconds \n", info, time);
 }
 
+double cputimer_stop_ret() {
+    gettimeofday(&t_end, 0);
+    double time = (1e6 * (t_end.tv_sec - t_start.tv_sec) + t_end.tv_usec - t_start.tv_usec);
+    return time * 1e-6;
+}
+
 // Initialize the sparse matrix needed for the heat time step
 void matrixInit(double* A, int* ArowPtr, int* AcolIndx, int dimX,
                 double alpha) {
@@ -216,11 +222,14 @@ int main(int argc, char** argv) {
     //@@ Insert code to allocate the buffer needed by cuSPARSE
     gpuCheck(cudaMalloc(&buffer, bufferSize));
 
+    double spmvTime = 0.0;
+    int it = 0;
     // Perform the time step iterations
-    for (int it = 0; it < nsteps; ++it) {
+    for (it = 0; it < nsteps; ++it) {
         //@@ Insert code to call cusparse api to compute the SMPV (sparse matrix multiplication) for
         //@@ the CSR matrix using cuSPARSE. This calculation corresponds to:
         //@@ tmp = 1 * A * temp + 0 * tmp
+        cputimer_start();
         cusparseSpMV(
             cusparseHandle,
             CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -233,6 +242,9 @@ int main(int argc, char** argv) {
             CUSPARSE_SPMV_ALG_DEFAULT,
             buffer
         );
+        double elapsed = cputimer_stop_ret();
+        spmvTime += elapsed;
+
 
         //@@ Insert code to call cublas api to compute the axpy routine using cuBLAS.
         //@@ This calculation corresponds to: temp = alpha * tmp + temp;
@@ -314,6 +326,17 @@ int main(int argc, char** argv) {
     // Calculate the relative error
     error = error / norm;
     printf("The relative error of the approximation is %f\n", error);
+
+    // Flops approximation
+    // Each matrix multiplication has 2 * nzv flops, one multiplication and one addition
+    // per non-zero value in the matrix
+    double totalFlops = it * 2 * nzv;
+    double gflops = (totalFlops / spmvTime) / 1e9;
+
+    printf("Iterations: %d\n", it);
+    printf("Total Operations: %f\n", totalFlops);
+    printf("SMPV time : %f\n", spmvTime);
+    printf("GFLOPs: %f\n", gflops);
 
     //@@ Insert the code to destroy the mat descriptor
     cusparseCheck(cusparseDestroySpMat(matA));

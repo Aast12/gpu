@@ -96,7 +96,6 @@ int main(int argc, char** argv) {
     double tempRight = 300.; // Right heat source applied to the rod
     cublasHandle_t cublasHandle; // cuBLAS handle
     cusparseHandle_t cusparseHandle; // cuSPARSE handle
-    cusparseMatDescr_t Adescriptor; // Mat descriptor needed by cuSPARSE
 
     // Read the arguments from the command line
     dimX = atoi(argv[1]);
@@ -184,16 +183,16 @@ int main(int argc, char** argv) {
         CUSPARSE_INDEX_BASE_ZERO,
         CUDA_R_64F
     ));
-    cusparseDnVecDescr_t vecT;
+    cusparseDnVecDescr_t vTemp;
     cusparseCheck(cusparseCreateDnVec(
-        &vecT,
+        &vTemp,
         dimX,
         temp,
         CUDA_R_64F
     ));
-    cusparseDnVecDescr_t vecY;
+    cusparseDnVecDescr_t vTmp;
     cusparseCheck(cusparseCreateDnVec(
-        &vecY,
+        &vTmp,
         dimX,
         tmp,
         CUDA_R_64F
@@ -207,9 +206,9 @@ int main(int argc, char** argv) {
         CUSPARSE_OPERATION_NON_TRANSPOSE,
         &one,
         matA,
-        vecT,
+        vTemp,
         &zero,
-        vecY,
+        vTmp,
         CUDA_R_64F,
         CUSPARSE_SPMV_ALG_DEFAULT,
         &bufferSize
@@ -227,9 +226,9 @@ int main(int argc, char** argv) {
             CUSPARSE_OPERATION_NON_TRANSPOSE,
             &one,
             matA,
-            vecT,
+            vTemp,
             &zero,
-            vecY,
+            vTmp,
             CUDA_R_64F,
             CUSPARSE_SPMV_ALG_DEFAULT,
             buffer
@@ -318,8 +317,8 @@ int main(int argc, char** argv) {
 
     //@@ Insert the code to destroy the mat descriptor
     cusparseCheck(cusparseDestroySpMat(matA));
-    cusparseCheck(cusparseDestroyDnVec(vecT));
-    cusparseCheck(cusparseDestroyDnVec(vecY));
+    cusparseCheck(cusparseDestroyDnVec(vTemp));
+    cusparseCheck(cusparseDestroyDnVec(vTmp));
 
     //@@ Insert the code to destroy the cuSPARSE handle
     cusparseCheck(cusparseDestroy(cusparseHandle));
